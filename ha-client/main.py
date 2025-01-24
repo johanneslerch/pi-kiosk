@@ -97,11 +97,13 @@ def get_cpu_temperature():
 def turn_display_on():
     env = os.environ.copy()
     env["WAYLAND_DISPLAY"] = "wayland-0"
+    env["XDG_RUNTIME_DIR"] = "/run/user/1000"
     subprocess.run(["wlopm", "--on", "DSI-2"], env=env)
 
 def turn_display_off():
     env = os.environ.copy()
     env["WAYLAND_DISPLAY"] = "wayland-0"
+    env["XDG_RUNTIME_DIR"] = "/run/user/1000"
     subprocess.run(["wlopm", "--off", "DSI-2"], env=env)
 
 def get_display_state() -> bool:

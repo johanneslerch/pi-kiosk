@@ -1,0 +1,13 @@
+[Unit]
+Description=Home Assistant Kiosk Client 
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+ExecStart=/home/joe/kiosk/ha-client/.venv/bin/python /home/joe/kiosk/ha-client/main.py
+Restart=always
+User=joe
+WorkingDirectory=/home/joe/kiosk/ha-client
+
+[Install]
+WantedBy=multi-user.target

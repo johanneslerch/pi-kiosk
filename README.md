@@ -96,3 +96,17 @@ I've created a dedicated user to be used for the kiosk. Home Assistant has a ver
 I've started a [python script](ha-client/main.py) that registers the kiosk via the MQTT integration's discovery mechanism.
 So far it allows me to control the screen (backlight on/off and dimming) and reports the CPU temperature.
 More is planned when adding more hardware (thinking of speaker, status LEDs, motion sensors).
+
+The script can be registered as service as follows:
+
+```
+sudo ln -s /home/joe/kiosk/ha-client/ha-client.service /etc/systemd/system/ha-client.service
+sudo systemctl daemon-reload
+sudo systemctl enable ha-client.service
+sudo systemctl start ha-client.service
+```
+
+Logs are available via 
+```
+journalctl -u ha-client.service
+```

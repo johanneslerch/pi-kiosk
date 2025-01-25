@@ -4,10 +4,12 @@ After=network-online.target
 Requires=network-online.target
 
 [Service]
-ExecStart=/home/joe/kiosk/ha-client/.venv/bin/python /home/joe/kiosk/ha-client/main.py
+ExecStart=/home/joe/kiosk/ha-client/.venv/bin/python -u /home/joe/kiosk/ha-client/main.py
 Restart=always
 User=joe
 WorkingDirectory=/home/joe/kiosk/ha-client
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target

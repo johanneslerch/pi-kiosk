@@ -3,6 +3,7 @@ import json
 import time
 import subprocess
 import os
+import psutil
 
 MQTT_BROKER = "homedroid"
 MQTT_PORT = 1883
@@ -94,17 +95,32 @@ def get_cpu_temperature():
         temp = float(f.read()) / 1000.0 
     return round(temp, 2)
 
+def terminate_process_tree(pid):
+    parent = psutil.Process(pid)
+    for child in parent.children(recursive=True):
+        child.terminate()
+    parent.terminate()
+
 def turn_display_on():
+    global turn_display_off_process
+    if turn_display_off_process and turn_display_off_process.poll() is None:
+        terminate_process_tree(turn_display_off_process.pid)
+
     env = os.environ.copy()
     env["WAYLAND_DISPLAY"] = "wayland-0"
     env["XDG_RUNTIME_DIR"] = "/run/user/1000"
     subprocess.run(["wlopm", "--on", "DSI-2"], env=env)
 
+turn_display_off_process = None
 def turn_display_off():
+    global turn_display_off_process
+    if turn_display_off_process and turn_display_off_process.poll() is None:
+        terminate_process_tree(turn_display_off_process.pid)
+
     env = os.environ.copy()
     env["WAYLAND_DISPLAY"] = "wayland-0"
     env["XDG_RUNTIME_DIR"] = "/run/user/1000"
-    subprocess.run(["wlopm", "--off", "DSI-2"], env=env)
+    turn_display_off_process = subprocess.Popen(["./turn-screen-off.sh"], env=env)
 
 def get_display_state() -> bool:
     with open("/sys/class/backlight/11-0045/bl_power", "r") as f:

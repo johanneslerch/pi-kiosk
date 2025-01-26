@@ -4,6 +4,8 @@ import time
 import subprocess
 import os
 import psutil
+import gpiod
+from gpiozero import RGBLED
 
 MQTT_BROKER = "homedroid"
 MQTT_PORT = 1883
@@ -14,8 +16,16 @@ TOPIC_DISPLAY = f"{DEVICE_ID}/display"
 TOPIC_DISPLAY_SET = f"{DEVICE_ID}/display/set"
 TOPIC_BRIGHTNESS_STATE = f"{DEVICE_ID}/display/brightness"
 TOPIC_BRIGHTNESS_STATE_SET = f"{DEVICE_ID}/display/brightness/set"
+TOPIC_LED = f"{DEVICE_ID}/led"
+TOPIC_LED_SET = f"{DEVICE_ID}/led/set"
+TOPIC_LED_COLOR_STATE = f"{DEVICE_ID}/led/color"
+TOPIC_LED_COLOR_STATE_SET = f"{DEVICE_ID}/led/color/set"
+
+PIN_MOTION = 17
 
 
+
+led = RGBLED(red=22, green=27, blue=23)
 display_state = None
 display_brightness = None
 
@@ -33,12 +43,23 @@ def on_message(client, userdata, msg):
             turn_display_off()
         else:
             raise RuntimeError("Invalid state for display: "+msg.payload.decode())
+        publish_display_state(client)
     elif msg.topic == TOPIC_BRIGHTNESS_STATE_SET:
         set_display_brightness(int(msg.payload))
+        publish_display_state(client)
+    elif msg.topic == TOPIC_LED_SET:
+        if msg.payload.decode() == "ON":
+            turn_led_on(client)
+        elif msg.payload.decode() == "OFF":
+            turn_led_off(client)
+        else:
+            raise RuntimeError("Invalid state for display: "+msg.payload.decode())
+    elif msg.topic == TOPIC_LED_COLOR_STATE_SET:
+        set_led_color(client, msg.payload.decode())
     else:
         print(f"Received message for unhandled topic: {msg.topic}")
 
-    publish_display_state(client)
+    
 
 def register_device(client):
     payload = {
@@ -70,6 +91,28 @@ def register_device(client):
                 "brightness_scale": get_max_display_brightness(),
                 "payload_on": "ON",
                 "payload_off": "OFF",
+            },
+            "motion": {
+                "name": "Motion Sensor",
+                "p": "binary_sensor",
+                "unique_id": "rpi-eg-movement",
+                "state_topic": TOPIC_SENSORS,
+                "device_class": "motion",
+                "payload_on": "ON",
+                "payload_off": "OFF",
+                "value_template":"{{ value_json.motion}}"
+            },
+            "led": {
+                "name": "LED",
+                "p": "light",
+                "unique_id":"rpi-eg-led",
+                "state_topic": TOPIC_LED,
+                "command_topic": TOPIC_LED_SET,
+                "rgb_state_topic": TOPIC_LED_COLOR_STATE,
+                "rgb_command_topic": TOPIC_LED_COLOR_STATE_SET,
+                "payload_on": "ON",
+                "payload_off": "OFF",
+                "rgb": True
             }
         }
     }
@@ -84,9 +127,10 @@ def publish_display_state(client):
     client.publish(TOPIC_DISPLAY, "ON" if display_state else "OFF")
     client.publish(TOPIC_BRIGHTNESS_STATE, display_brightness)
 
-def publish_sensor_values(client):
+def publish_sensor_values(client, motion):
     payload = {
-        "temperature_cpu": get_cpu_temperature()
+        "temperature_cpu": get_cpu_temperature(),
+        "motion": "ON" if motion else "OFF"
     }
     client.publish(TOPIC_SENSORS, json.dumps(payload))
 
@@ -140,7 +184,29 @@ def set_display_brightness(value: int):
     with open("/sys/class/backlight/11-0045/brightness", "w") as file:
         file.write(str(value))
 
+def turn_led_on(client):
+    if not led.is_active:
+        led.on()
+    publish_led_values(client)
+
+def turn_led_off(client):
+    led.off()
+    publish_led_values(client)
+
+def set_led_color(client, color):
+    led.color = tuple(float(color)/255 for color in color.split(","))
+    publish_led_values(client)
+
+def publish_led_values(client):
+    client.publish(TOPIC_LED, "ON" if led.is_active else "OFF")
+    client.publish(TOPIC_LED_COLOR_STATE, ",".join(str(round(color*255)) for color in led.color))
+
 def main():
+    chip = gpiod.Chip('gpiochip0')
+    motion_line = chip.get_line(17)
+    motion_line.request(consumer="gpio-reader", type=gpiod.LINE_REQ_EV_BOTH_EDGES )
+
+
     client = mqtt.Client(protocol=mqtt.MQTTv311, transport="tcp", callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
     client.on_message = on_message
@@ -149,15 +215,20 @@ def main():
 
     client.subscribe(TOPIC_DISPLAY_SET)
     client.subscribe(TOPIC_BRIGHTNESS_STATE_SET)
+    client.subscribe(TOPIC_LED_SET)
+    client.subscribe(TOPIC_LED_COLOR_STATE_SET)
 
     register_device(client)
     client.loop_start()
 
+    publish_led_values(client)
+
     try:
         seconds = 0
         while True:
-            if seconds == 60:
-                publish_sensor_values(client)
+            motion_event = motion_line.event_read()
+            if seconds == 60 or motion_event:
+                publish_sensor_values(client, motion_event.type == gpiod.LineEvent.RISING_EDGE if motion_event else False)
                 seconds = 0
             
             if display_state != get_display_state() or display_brightness != get_display_brightness():

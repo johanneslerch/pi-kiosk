@@ -21,11 +21,9 @@ TOPIC_LED_SET = f"{DEVICE_ID}/led/set"
 TOPIC_LED_COLOR_STATE = f"{DEVICE_ID}/led/color"
 TOPIC_LED_COLOR_STATE_SET = f"{DEVICE_ID}/led/color/set"
 
-PIN_MOTION = 17
+PIN_MOTION = 23
+led = RGBLED(red=24, green=25, blue=12)
 
-
-
-led = RGBLED(red=22, green=27, blue=23)
 display_state = None
 display_brightness = None
 
@@ -203,7 +201,7 @@ def publish_led_values(client):
 
 def main():
     chip = gpiod.Chip('gpiochip0')
-    motion_line = chip.get_line(17)
+    motion_line = chip.get_line(PIN_MOTION)
     motion_line.request(consumer="gpio-reader", type=gpiod.LINE_REQ_EV_BOTH_EDGES )
 
 

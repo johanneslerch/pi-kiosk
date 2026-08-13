@@ -22,7 +22,9 @@ TOPIC_LED_COLOR_STATE = f"{DEVICE_ID}/led/color"
 TOPIC_LED_COLOR_STATE_SET = f"{DEVICE_ID}/led/color/set"
 
 PIN_MOTION = 23
+
 led = RGBLED(red=24, green=25, blue=12)
+
 
 display_state = None
 display_brightness = None
@@ -193,6 +195,7 @@ def turn_led_off(client):
 
 def set_led_color(client, color):
     led.color = tuple(float(color)/255 for color in color.split(","))
+    print(f"LED color set to {led.red},{led.green},{led.blue}")
     publish_led_values(client)
 
 def publish_led_values(client):
@@ -200,7 +203,7 @@ def publish_led_values(client):
     client.publish(TOPIC_LED_COLOR_STATE, ",".join(str(round(color*255)) for color in led.color))
 
 def main():
-    chip = gpiod.Chip('gpiochip0')
+    chip = gpiod.Chip('gpiochip15')
     motion_line = chip.get_line(PIN_MOTION)
     motion_line.request(consumer="gpio-reader", type=gpiod.LINE_REQ_EV_BOTH_EDGES )
 
@@ -223,16 +226,19 @@ def main():
 
     try:
         seconds = 0
+        motion = False
         while True:
-            motion_event = motion_line.event_read()
-            if seconds == 60 or motion_event:
-                publish_sensor_values(client, motion_event.type == gpiod.LineEvent.RISING_EDGE if motion_event else False)
+            motion_event_ready = motion_line.event_wait(1)
+            if seconds == 60 or motion_event_ready:
+                if motion_event_ready:
+                    motion_event = motion_line.event_read()
+                    motion = motion_event.type == gpiod.LineEvent.RISING_EDGE
+                publish_sensor_values(client, motion)
                 seconds = 0
             
             if display_state != get_display_state() or display_brightness != get_display_brightness():
                 publish_display_state(client)
             
-            time.sleep(1) 
             seconds += 1
     except KeyboardInterrupt:
         print("Stopping MQTT client.")

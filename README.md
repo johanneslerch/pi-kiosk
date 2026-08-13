@@ -71,6 +71,7 @@ Change `~/.config/labwc/rc.xml` to something along:
             <tapButtonMap>lmr</tapButtonMap> <!-- Map tap to left, middle, right buttons -->
             <clickMethod>clickfinger</clickMethod> <!-- Enable long-press (right-click) -->
             <sendEventsMode>yes</sendEventsMode>
+            <calibrationMatrix>0 1 0 -1 0 1</calibrationMatrix>
         </device>
     </libinput>
 
@@ -88,6 +89,12 @@ Change `~/.config/labwc/rc.xml` to something along:
 ```
 
 The important parts here seem to be the `device` section with category `touch` and to disable mouse emulation in the `touch` element.
+
+## Autostart Chromium in Kiosk mode
+Add to .config/labwc/autostart
+```
+/usr/bin/chromium-browser --password-store=basic --noerrdialogs --disable-infobars --start-fullscreen --app=http://homedroid:8123/
+```
 
 ## Home Assistant
 
